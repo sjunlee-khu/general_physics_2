@@ -167,12 +167,7 @@
                 <button id="negativeBtn" type="button" class="active">− Negative</button>
                 <button id="positiveBtn" type="button">+ Positive</button>
             </div>
-
-            <label for="magnitude">|q₂|</label>
-            <input id="magnitude" type="range" min="0.5" max="2.0" step="0.25" value="1.0">
-            <div>|q₂| = <span id="q2Value">1.00</span></div>
-
-            <label for="fluxCount">Equal-flux surfaces per unit charge</label>
+<label for="fluxCount">Equal-flux surfaces per unit charge</label>
             <input id="fluxCount" type="range" min="8" max="28" step="2" value="18">
             <div>N = <span id="fluxValue">18</span></div>
 
@@ -185,16 +180,7 @@
             <button id="resetBtn" type="button" style="width:100%; margin-top:14px;">
                 Reset q₂ position
             </button>
-
-            <div class="note">
-                <b>표시 원리</b><br>
-                일반 전기력선은 cosθ를 균등하게 나누어 동일한 3차원 flux를 나타냅니다.
-                두 전하를 잇는 대칭축에서는 실제 Coulomb 전기장 E∥(s)을 계산해
-                E = 0인 null point를 수치적으로 찾고 그 위치에서 선을 끊습니다.
-                +−에서는 안쪽과 양쪽 바깥쪽 축선을 표시하고,
-                ++에서는 교과서 관례에 따라 바깥쪽 축선만 표시합니다.
-            </div>
-        </div>
+</div>
     </div>
 </div>
 
@@ -214,10 +200,8 @@
 
     const negativeBtn = document.getElementById("negativeBtn");
     const positiveBtn = document.getElementById("positiveBtn");
-    const magnitude = document.getElementById("magnitude");
     const fluxCount = document.getElementById("fluxCount");
 
-    const q2Value = document.getElementById("q2Value");
     const fluxValue = document.getElementById("fluxValue");
     const q2Info = document.getElementById("q2Info");
     const xInfo = document.getElementById("xInfo");
@@ -858,7 +842,6 @@
             q2Circle.setAttribute("stroke", "#1d4ed8");
         }
 
-        q2Value.textContent = mag.toFixed(2);
         q2Info.textContent = `${sign}${mag.toFixed(2)}`;
         xInfo.textContent = Math.round(q2.x);
         yInfo.textContent = Math.round(q2.y);
@@ -948,7 +931,7 @@
     });
 
     negativeBtn.addEventListener("click", () => {
-        q2.q = -Math.abs(Number(magnitude.value));
+        q2.q = -1.0;
 
         negativeBtn.classList.add("active");
         positiveBtn.classList.remove("active");
@@ -957,17 +940,11 @@
     });
 
     positiveBtn.addEventListener("click", () => {
-        q2.q = Math.abs(Number(magnitude.value));
+        q2.q = +1.0;
 
         positiveBtn.classList.add("active");
         negativeBtn.classList.remove("active");
 
-        redraw();
-    });
-
-    magnitude.addEventListener("input", () => {
-        const s = q2.q >= 0 ? 1 : -1;
-        q2.q = s*Number(magnitude.value);
         redraw();
     });
 
