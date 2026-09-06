@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two Point Charges — Equal-Flux Electric Field Lines</title>
+
+<style>
+    body {
+        font-family: Arial, 'Noto Sans KR', sans-serif;
+        margin: 0;
+        background: #f7f7f8;
+        color: #222;
+    }
+
+    .wrap {
+        max-width: 1120px;
+        margin: 28px auto;
+        padding: 20px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 28px; }
+
+    .sub {
+        margin-bottom: 18px;
+        color: #666;
+        line-height: 1.55;
+    }
+
+    .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 18px;
+        align-items: start;
+    }
+
+    .panel {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 14px;
+        padding: 15px;
+    }
+
+    svg {
+        width: 100%;
+        height: auto;
+        display: block;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        touch-action: none;
+    }
+
+    label {
+        display: block;
+        font-weight: 700;
+        margin: 14px 0 6px;
+    }
+
+    input[type="range"] { width: 100%; }
+
+    .buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    button {
+        min-height: 42px;
+        padding: 8px 12px;
+        border: 1px solid #bbb;
+        border-radius: 9px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 15px;
+    }
+
+    .buttons button { flex: 1; }
+
+    button.active {
+        background: #e8eefc;
+        border-color: #5677d9;
+    }
+
+    .info {
+        margin-top: 16px;
+        padding: 11px;
+        border-radius: 10px;
+        background: #f3f4f6;
+        line-height: 1.6;
+        font-size: 14px;
+    }
+
+    .note {
+        margin-top: 14px;
+        font-size: 13px;
+        color: #666;
+        line-height: 1.55;
+    }
+
+    .charge-handle { cursor: grab; }
+    .charge-handle.dragging { cursor: grabbing; }
+
+    @media (max-width: 820px) {
+        .layout { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+    <h1>Electric Field Lines: Two Point Charges</h1>
+
+    <div class="sub">
+        전기력선은 Coulomb 전기장 <b>E ∝ 1/r²</b>을 직접 수치적분해서 계산합니다.
+        각 선은 동일한 3차원 electric flux를 나타내도록 <b>cos θ를 균등하게</b> 나누어 시작합니다.
+    </div>
+
+    <div class="layout">
+
+        <div class="panel">
+            <svg id="viz" viewBox="0 0 760 520" aria-label="두 점전하의 전기력선">
+                <defs>
+                    <marker id="arrow" markerWidth="7" markerHeight="7"
+                            refX="6" refY="3.5" orient="auto">
+                        <path d="M0,0 L7,3.5 L0,7 Z" fill="#536fc4"></path>
+                    </marker>
+                </defs>
+
+                <g id="fieldLines"></g>
+
+                <!-- q1 fixed -->
+                <g>
+                    <circle cx="245" cy="260" r="24"
+                            fill="#d65b63" stroke="#a82e38" stroke-width="2"></circle>
+                    <text x="245" y="268" text-anchor="middle"
+                          font-size="27" font-weight="700" fill="white">+</text>
+                    <text x="245" y="303" text-anchor="middle" font-size="15">q₁ = +1.00</text>
+                    <text x="245" y="322" text-anchor="middle" font-size="13" fill="#666">fixed</text>
+                </g>
+
+                <!-- q2 draggable -->
+                <g id="charge2" class="charge-handle" tabindex="0"
+                   aria-label="두 번째 전하. 마우스로 드래그하거나 방향키로 움직일 수 있습니다.">
+                    <circle id="q2Hit" cx="515" cy="260" r="36" fill="transparent"></circle>
+                    <circle id="q2Circle" cx="515" cy="260" r="24"
+                            fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"></circle>
+                    <text id="q2Sign" x="515" y="268" text-anchor="middle"
+                          font-size="27" font-weight="700" fill="white">−</text>
+                    <text id="q2Label" x="515" y="303" text-anchor="middle" font-size="15">q₂ = −1.00</text>
+                    <text id="dragLabel" x="515" y="322" text-anchor="middle"
+                          font-size="13" fill="#666">drag me</text>
+                </g>
+
+                <circle id="nullDot" r="4.5" fill="#333" opacity="0"></circle>
+                <text id="nullLabel" text-anchor="middle" font-size="13"
+                      fill="#444" opacity="0">E = 0</text>
+
+                <text x="380" y="495" text-anchor="middle" font-size="13" fill="#666">
+                    Equal-flux seeding: ΔΦ is the same between neighboring flux surfaces.
+                </text>
+            </svg>
+        </div>
+
+        <div class="panel">
+            <label>Second charge q₂ sign</label>
+            <div class="buttons">
+                <button id="negativeBtn" type="button" class="active">− Negative</button>
+                <button id="positiveBtn" type="button">+ Positive</button>
+            </div>
+
+            <label for="magnitude">|q₂|</label>
+            <input id="magnitude" type="range" min="0.5" max="2.0" step="0.25" value="1.0">
+            <div>|q₂| = <span id="q2Value">1.00</span></div>
+
+            <label for="fluxCount">Equal-flux surfaces per unit charge</label>
+            <input id="fluxCount" type="range" min="8" max="28" step="2" value="18">
+            <div>N = <span id="fluxValue">18</span></div>
+
+            <div class="info">
+                <div><b>q₁:</b> +1.00</div>
+                <div><b>q₂:</b> <span id="q2Info">−1.00</span></div>
+                <div><b>q₂ position:</b> (<span id="xInfo">515</span>, <span id="yInfo">260</span>)</div>
+            </div>
+
+            <button id="resetBtn" type="button" style="width:100%; margin-top:14px;">
+                Reset q₂ position
+            </button>
+
+            <div class="note">
+                <b>표시 원리</b><br>
+                일반 전기력선은 cosθ를 균등하게 나누어 동일한 3차원 flux를 나타냅니다.
+                두 전하를 잇는 대칭축에서는 실제 Coulomb 전기장 E∥(s)을 계산해
+                E = 0인 null point를 수치적으로 찾고 그 위치에서 선을 끊습니다.
+                +−에서는 안쪽과 양쪽 바깥쪽 축선을 표시하고,
+                ++에서는 교과서 관례에 따라 바깥쪽 축선만 표시합니다.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const NS = "http://www.w3.org/2000/svg";
+
+    const svg = document.getElementById("viz");
+    const fieldLines = document.getElementById("fieldLines");
+
+    const charge2 = document.getElementById("charge2");
+    const q2Hit = document.getElementById("q2Hit");
+    const q2Circle = document.getElementById("q2Circle");
+    const q2Sign = document.getElementById("q2Sign");
+    const q2Label = document.getElementById("q2Label");
+    const dragLabel = document.getElementById("dragLabel");
+
+    const negativeBtn = document.getElementById("negativeBtn");
+    const positiveBtn = document.getElementById("positiveBtn");
+    const magnitude = document.getElementById("magnitude");
+    const fluxCount = document.getElementById("fluxCount");
+
+    const q2Value = document.getElementById("q2Value");
+    const fluxValue = document.getElementById("fluxValue");
+    const q2Info = document.getElementById("q2Info");
+    const xInfo = document.getElementById("xInfo");
+    const yInfo = document.getElementById("yInfo");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const nullDot = document.getElementById("nullDot");
+    const nullLabel = document.getElementById("nullLabel");
+
+    const q1 = { x: 245, y: 260, q: 1.0 };
+    const q2 = { x: 515, y: 260, q: -1.0 };
+
+    const bounds = { left: 55, right: 705, top: 55, bottom: 445 };
+
+    let dragging = false;
+    let pointerId = null;
+
+    function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    function fieldAt(x, y) {
+        let ex = 0;
+        let ey = 0;
+
+        for (const c of [q1, q2]) {
+            const dx = x - c.x;
+            const dy = y - c.y;
+            const r2 = dx*dx + dy*dy;
+
+            if (r2 < 9) continue;
+
+            const r = Math.sqrt(r2);
+            const a = c.q / (r2*r);
+
+            ex += a*dx;
+            ey += a*dy;
+        }
+
+        return {
+            ex,
+            ey,
+            mag: Math.hypot(ex, ey)
+        };
+    }
+
+    function axisBasis() {
+        const dx = q2.x - q1.x;
+        const dy = q2.y - q1.y;
+        const L = Math.hypot(dx, dy);
+
+        return {
+            ex: dx/L,
+            ey: dy/L,
+            nx: -dy/L,
+            ny: dx/L,
+            L
+        };
+    }
+
+    function reflectAcrossAxis(points) {
+        const b = axisBasis();
+        const ox = q1.x;
+        const oy = q1.y;
+
+        return points.map(([x,y]) => {
+            const vx = x - ox;
+            const vy = y - oy;
+
+            const a = vx*b.ex + vy*b.ey;
+            const n = vx*b.nx + vy*b.ny;
+
+            return [
+                ox + a*b.ex - n*b.nx,
+                oy + a*b.ey - n*b.ny
+            ];
+        });
+    }
+
+    function unitField(x, y, direction) {
+        const f = fieldAt(x, y);
+
+        if (f.mag < 1e-13) return null;
+
+        return {
+            x: direction*f.ex/f.mag,
+            y: direction*f.ey/f.mag,
+            mag: f.mag
+        };
+    }
+
+    function integrate(seedX, seedY, direction, maxSteps=9000) {
+        const pts = [];
+        let x = seedX;
+        let y = seedY;
+
+        const ds = 2.0;
+        const farR = 5200;
+        const b = axisBasis();
+        const mx = 0.5*(q1.x + q2.x);
+        const my = 0.5*(q1.y + q2.y);
+
+        let endType = "max";
+
+        for (let i=0; i<maxSteps; i++) {
+            if (Math.hypot(x-mx, y-my) > farR) {
+                endType = "infinity";
+                break;
+            }
+
+            const d1 = Math.hypot(x-q1.x, y-q1.y);
+            const d2 = Math.hypot(x-q2.x, y-q2.y);
+
+            if (pts.length > 8) {
+                if (direction > 0) {
+                    if (q1.q < 0 && d1 < 23) { endType = "q1"; break; }
+                    if (q2.q < 0 && d2 < 23) { endType = "q2"; break; }
+                } else {
+                    if (q1.q > 0 && d1 < 23) { endType = "q1"; break; }
+                    if (q2.q > 0 && d2 < 23) { endType = "q2"; break; }
+                }
+            }
+
+            const k1 = unitField(x, y, direction);
+            if (!k1 || k1.mag < 1e-11) {
+                endType = "null";
+                break;
+            }
+
+            const k2 = unitField(
+                x + 0.5*ds*k1.x,
+                y + 0.5*ds*k1.y,
+                direction
+            );
+            if (!k2) { endType = "null"; break; }
+
+            const k3 = unitField(
+                x + 0.5*ds*k2.x,
+                y + 0.5*ds*k2.y,
+                direction
+            );
+            if (!k3) { endType = "null"; break; }
+
+            const k4 = unitField(
+                x + ds*k3.x,
+                y + ds*k3.y,
+                direction
+            );
+            if (!k4) { endType = "null"; break; }
+
+            pts.push([x,y]);
+
+            x += ds*(k1.x + 2*k2.x + 2*k3.x + k4.x)/6;
+            y += ds*(k1.y + 2*k2.y + 2*k3.y + k4.y)/6;
+        }
+
+        return { pts, endType };
+    }
+
+    function addPath(points) {
+        if (!points || points.length < 6) return;
+
+        let d = `M ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
+
+        for (let i=1; i<points.length; i++) {
+            d += ` L ${points[i][0].toFixed(2)} ${points[i][1].toFixed(2)}`;
+        }
+
+        const p = document.createElementNS(NS, "path");
+        p.setAttribute("d", d);
+        p.setAttribute("fill", "none");
+        p.setAttribute("stroke", "#536fc4");
+        p.setAttribute("stroke-width", "1.55");
+        p.setAttribute("opacity", "0.92");
+        fieldLines.appendChild(p);
+
+        const visible = [];
+
+        for (let i=4; i<points.length-4; i++) {
+            const [x,y] = points[i];
+
+            if (x > 15 && x < 745 && y > 15 && y < 475) {
+                visible.push(i);
+            }
+        }
+
+        if (!visible.length) return;
+
+        const idx = visible[Math.floor(visible.length*0.60)];
+        const a = points[idx-2];
+        const b = points[idx+2];
+
+        const arrow = document.createElementNS(NS, "line");
+        arrow.setAttribute("x1", a[0]);
+        arrow.setAttribute("y1", a[1]);
+        arrow.setAttribute("x2", b[0]);
+        arrow.setAttribute("y2", b[1]);
+        arrow.setAttribute("stroke", "#536fc4");
+        arrow.setAttribute("stroke-width", "1.55");
+        arrow.setAttribute("marker-end", "url(#arrow)");
+        fieldLines.appendChild(arrow);
+    }
+
+    function equalFluxThetas(N) {
+        /*
+         * Equal 3D flux:
+         * dPhi ∝ dOmega = 2π sin(theta)dtheta = -2π d(cos theta).
+         *
+         * Therefore choose midpoint values uniformly in mu = cos(theta).
+         * We draw only the +normal meridional half-plane and mirror it exactly.
+         */
+        const theta = [];
+
+        for (let j=0; j<N; j++) {
+            const mu = 1 - 2*(j + 0.5)/N;
+            theta.push(Math.acos(clamp(mu, -1, 1)));
+        }
+
+        return theta;
+    }
+
+    function seedFromPositiveCharge(c, N) {
+        const b = axisBasis();
+        const eps = 30;
+        const thetas = equalFluxThetas(N);
+
+        for (const theta of thetas) {
+            const ux = Math.cos(theta)*b.ex + Math.sin(theta)*b.nx;
+            const uy = Math.cos(theta)*b.ey + Math.sin(theta)*b.ny;
+
+            const sx = c.x + eps*ux;
+            const sy = c.y + eps*uy;
+
+            const tr = integrate(sx, sy, +1);
+
+            if (tr.pts.length < 6) continue;
+
+            addPath(tr.pts);
+
+            const mirrored = reflectAcrossAxis(tr.pts);
+            addPath(mirrored);
+        }
+    }
+
+    function addIncomingFromInfinityToNegative(c, Ndesired) {
+        /*
+         * Only needed when total negative charge exceeds total positive charge.
+         * Trace backward from the negative charge using equal-flux polar bins.
+         * Keep only traces that reach infinity; traces ending on a positive
+         * charge duplicate already-drawn flux surfaces.
+         */
+        if (Ndesired <= 0) return;
+
+        const b = axisBasis();
+        const eps = 30;
+
+        const trialN = Math.max(4*Ndesired, 32);
+        const thetas = equalFluxThetas(trialN);
+
+        let made = 0;
+
+        for (const theta of thetas) {
+            if (made >= Ndesired) break;
+
+            const ux = Math.cos(theta)*b.ex + Math.sin(theta)*b.nx;
+            const uy = Math.cos(theta)*b.ey + Math.sin(theta)*b.ny;
+
+            const sx = c.x + eps*ux;
+            const sy = c.y + eps*uy;
+
+            const tr = integrate(sx, sy, -1);
+
+            if (tr.endType !== "infinity" || tr.pts.length < 6) continue;
+
+            const forwardPts = tr.pts.slice().reverse();
+
+            addPath(forwardPts);
+            addPath(reflectAcrossAxis(forwardPts));
+
+            made++;
+        }
+    }
+
+
+    function rayToPlotBoundary(x, y, dx, dy) {
+        const xmin = 10, xmax = 750;
+        const ymin = 10, ymax = 475;
+        const candidates = [];
+
+        if (Math.abs(dx) > 1e-12) {
+            for (const X of [xmin, xmax]) {
+                const t = (X - x) / dx;
+                if (t > 0) {
+                    const yy = y + t*dy;
+                    if (yy >= ymin-1e-8 && yy <= ymax+1e-8) {
+                        candidates.push({t, x:X, y:yy});
+                    }
+                }
+            }
+        }
+
+        if (Math.abs(dy) > 1e-12) {
+            for (const Y of [ymin, ymax]) {
+                const t = (Y - y) / dy;
+                if (t > 0) {
+                    const xx = x + t*dx;
+                    if (xx >= xmin-1e-8 && xx <= xmax+1e-8) {
+                        candidates.push({t, x:xx, y:Y});
+                    }
+                }
+            }
+        }
+
+        if (!candidates.length) return {x, y};
+
+        candidates.sort((a,b) => a.t-b.t);
+        return candidates[0];
+    }
+
+    function axisCoordinateToXY(s) {
+        const b = axisBasis();
+
+        return {
+            x: q1.x + s*b.ex,
+            y: q1.y + s*b.ey
+        };
+    }
+
+    function axisField(s) {
+        /*
+         * Signed electric field along the line q1 -> q2.
+         * Positive means along +axis (from q1 toward q2).
+         *
+         * E_parallel(s) ∝ q1*s/|s|^3 + q2*(s-L)/|s-L|^3
+         */
+        const b = axisBasis();
+        const L = b.L;
+
+        let E = 0;
+
+        if (Math.abs(s) > 1e-10) {
+            E += q1.q * s / Math.pow(Math.abs(s), 3);
+        }
+
+        if (Math.abs(s-L) > 1e-10) {
+            E += q2.q * (s-L) / Math.pow(Math.abs(s-L), 3);
+        }
+
+        return E;
+    }
+
+    function bisectAxisRoot(a, b) {
+        let fa = axisField(a);
+        let fb = axisField(b);
+
+        if (!Number.isFinite(fa) || !Number.isFinite(fb)) return null;
+        if (fa === 0) return a;
+        if (fb === 0) return b;
+        if (fa*fb > 0) return null;
+
+        for (let i=0; i<80; i++) {
+            const m = 0.5*(a+b);
+            const fm = axisField(m);
+
+            if (!Number.isFinite(fm)) return null;
+
+            if (Math.abs(fm) < 1e-13) return m;
+
+            if (fa*fm <= 0) {
+                b = m;
+                fb = fm;
+            } else {
+                a = m;
+                fa = fm;
+            }
+        }
+
+        return 0.5*(a+b);
+    }
+
+    function findAxisNulls(sMin, sMax) {
+        /*
+         * Search the three nonsingular intervals separately:
+         * (-∞, q1), (q1, q2), (q2, +∞).
+         * For two point charges there can be at most one root in each interval,
+         * and in practice at most one finite axial null for the configurations here.
+         */
+        const L = axisBasis().L;
+        const eps = Math.max(1e-3, 1e-5*L);
+
+        const intervals = [
+            [sMin, -eps],
+            [eps, L-eps],
+            [L+eps, sMax]
+        ];
+
+        const roots = [];
+
+        for (const [a0,b0] of intervals) {
+            if (!(b0 > a0)) continue;
+
+            const N = 240;
+            let prevS = a0;
+            let prevF = axisField(prevS);
+
+            for (let i=1; i<=N; i++) {
+                const s = a0 + (b0-a0)*i/N;
+                const f = axisField(s);
+
+                if (
+                    Number.isFinite(prevF) &&
+                    Number.isFinite(f) &&
+                    prevF*f < 0
+                ) {
+                    const root = bisectAxisRoot(prevS, s);
+
+                    if (
+                        root !== null &&
+                        !roots.some(r => Math.abs(r-root) < 1e-4*L)
+                    ) {
+                        roots.push(root);
+                    }
+                }
+
+                prevS = s;
+                prevF = f;
+            }
+        }
+
+        roots.sort((a,b) => a-b);
+        return roots;
+    }
+
+    function straightPointsFromAxis(s1, s2, n=100) {
+        const pts = [];
+
+        for (let i=0; i<=n; i++) {
+            const t = i/n;
+            const s = s1 + (s2-s1)*t;
+            const p = axisCoordinateToXY(s);
+            pts.push([p.x, p.y]);
+        }
+
+        return pts;
+    }
+
+    function drawDirectedAxisSegment(sA, sB) {
+        if (!(sB > sA)) return;
+
+        const mid = 0.5*(sA+sB);
+        const E = axisField(mid);
+
+        if (!Number.isFinite(E) || Math.abs(E) < 1e-12) return;
+
+        // addPath() puts arrows from first point to last point,
+        // so order the segment according to the actual electric-field direction.
+        if (E > 0) {
+            addPath(straightPointsFromAxis(sA, sB));
+        } else {
+            addPath(straightPointsFromAxis(sB, sA));
+        }
+    }
+
+    function addAxialFieldLines() {
+        /*
+         * Axis lines are determined from the ACTUAL 1D Coulomb field.
+         * We locate finite null points and split the axis there.
+         *
+         * Textbook convention used here:
+         *   (+,-): draw both outer axial lines and the inner + -> - line.
+         *   (+,+): draw only the two outer axial lines; omit the special
+         *          inter-charge separatrix that terminates at the null point.
+         */
+        const b = axisBasis();
+        const L = b.L;
+        const chargeGap = 27;
+
+        const leftBoundary = rayToPlotBoundary(
+            q1.x, q1.y, -b.ex, -b.ey
+        );
+
+        const rightBoundary = rayToPlotBoundary(
+            q2.x, q2.y, +b.ex, +b.ey
+        );
+
+        const sLeft = -Math.hypot(
+            leftBoundary.x-q1.x,
+            leftBoundary.y-q1.y
+        );
+
+        const sRight = L + Math.hypot(
+            rightBoundary.x-q2.x,
+            rightBoundary.y-q2.y
+        );
+
+        const nulls = findAxisNulls(sLeft, sRight);
+        const nullGap = Math.max(5, 0.012*L);
+
+        function splitAndDraw(a, b) {
+            if (!(b > a)) return;
+
+            const inside = nulls.filter(s => s > a && s < b);
+            let cursor = a;
+
+            for (const s0 of inside) {
+                const leftEnd = Math.max(cursor, s0-nullGap);
+
+                if (leftEnd > cursor) {
+                    drawDirectedAxisSegment(cursor, leftEnd);
+                }
+
+                cursor = Math.min(b, s0+nullGap);
+            }
+
+            if (b > cursor) {
+                drawDirectedAxisSegment(cursor, b);
+            }
+        }
+
+        // Left outer axis.
+        splitAndDraw(sLeft, -chargeGap);
+
+        if (q2.q < 0) {
+            // Opposite signs: exact axial line between + and -.
+            splitAndDraw(chargeGap, L-chargeGap);
+        }
+
+        // Same signs intentionally omit the inter-charge axial separatrix.
+
+        // Right outer axis.
+        splitAndDraw(L+chargeGap, sRight);
+    }
+
+    function drawLines() {
+        fieldLines.replaceChildren();
+
+        const base = Number(fluxCount.value);
+        fluxValue.textContent = base;
+
+        /*
+         * N counts flux surfaces in ONE meridional half-plane.
+         * Mirroring across the charge axis guarantees exact visual symmetry.
+         */
+        const N1 = Math.max(4, Math.round(base*Math.abs(q1.q)));
+
+        if (q1.q > 0) {
+            seedFromPositiveCharge(q1, N1);
+        }
+
+        if (q2.q > 0) {
+            const N2 = Math.max(4, Math.round(base*Math.abs(q2.q)));
+            seedFromPositiveCharge(q2, N2);
+        }
+
+        if (q2.q < 0 && Math.abs(q2.q) > Math.abs(q1.q)) {
+            const excess = Math.round(
+                base*(Math.abs(q2.q) - Math.abs(q1.q))
+            );
+
+            addIncomingFromInfinityToNegative(q2, excess);
+        }
+
+        // Add the exact symmetry-axis field lines separately.
+        addAxialFieldLines();
+    }
+
+    function updateNullPoint() {
+        const b = axisBasis();
+
+        const leftBoundary = rayToPlotBoundary(
+            q1.x, q1.y, -b.ex, -b.ey
+        );
+
+        const rightBoundary = rayToPlotBoundary(
+            q2.x, q2.y, +b.ex, +b.ey
+        );
+
+        const sLeft = -Math.hypot(
+            leftBoundary.x-q1.x,
+            leftBoundary.y-q1.y
+        );
+
+        const sRight = b.L + Math.hypot(
+            rightBoundary.x-q2.x,
+            rightBoundary.y-q2.y
+        );
+
+        const roots = findAxisNulls(sLeft, sRight);
+
+        if (!roots.length) {
+            nullDot.setAttribute("opacity", "0");
+            nullLabel.setAttribute("opacity", "0");
+            return;
+        }
+
+        /*
+         * For two charges in the present parameter range there is one
+         * physically relevant finite axial null.
+         */
+        const p = axisCoordinateToXY(roots[0]);
+
+        nullDot.setAttribute("cx", p.x);
+        nullDot.setAttribute("cy", p.y);
+
+        nullLabel.setAttribute("x", p.x);
+        nullLabel.setAttribute("y", p.y-14);
+
+        nullDot.setAttribute("opacity", "0.75");
+        nullLabel.setAttribute("opacity", "1");
+    }
+
+    function updateQ2Visual() {
+        const sign = q2.q >= 0 ? "+" : "−";
+        const mag = Math.abs(q2.q);
+
+        q2Hit.setAttribute("cx", q2.x);
+        q2Hit.setAttribute("cy", q2.y);
+
+        q2Circle.setAttribute("cx", q2.x);
+        q2Circle.setAttribute("cy", q2.y);
+
+        q2Sign.setAttribute("x", q2.x);
+        q2Sign.setAttribute("y", q2.y+8);
+        q2Sign.textContent = sign;
+
+        q2Label.setAttribute("x", q2.x);
+        q2Label.setAttribute("y", q2.y+43);
+        q2Label.textContent = `q₂ = ${sign}${mag.toFixed(2)}`;
+
+        dragLabel.setAttribute("x", q2.x);
+        dragLabel.setAttribute("y", q2.y+62);
+
+        if (q2.q >= 0) {
+            q2Circle.setAttribute("fill", "#d65b63");
+            q2Circle.setAttribute("stroke", "#a82e38");
+        } else {
+            q2Circle.setAttribute("fill", "#3b82f6");
+            q2Circle.setAttribute("stroke", "#1d4ed8");
+        }
+
+        q2Value.textContent = mag.toFixed(2);
+        q2Info.textContent = `${sign}${mag.toFixed(2)}`;
+        xInfo.textContent = Math.round(q2.x);
+        yInfo.textContent = Math.round(q2.y);
+    }
+
+    function redraw() {
+        updateQ2Visual();
+        updateNullPoint();
+        drawLines();
+    }
+
+    function svgPoint(ev) {
+        const p = svg.createSVGPoint();
+        p.x = ev.clientX;
+        p.y = ev.clientY;
+
+        const m = svg.getScreenCTM();
+
+        if (!m) return {x:q2.x, y:q2.y};
+
+        return p.matrixTransform(m.inverse());
+    }
+
+    charge2.addEventListener("pointerdown", ev => {
+        dragging = true;
+        pointerId = ev.pointerId;
+
+        charge2.setPointerCapture(pointerId);
+        charge2.classList.add("dragging");
+    });
+
+    charge2.addEventListener("pointermove", ev => {
+        if (!dragging || ev.pointerId !== pointerId) return;
+
+        const p = svgPoint(ev);
+
+        q2.x = clamp(p.x, bounds.left, bounds.right);
+        q2.y = clamp(p.y, bounds.top, bounds.bottom);
+
+        const dx = q2.x-q1.x;
+        const dy = q2.y-q1.y;
+        const r = Math.hypot(dx,dy);
+        const minSep = 75;
+
+        if (r < minSep) {
+            const ux = r > 1e-8 ? dx/r : 1;
+            const uy = r > 1e-8 ? dy/r : 0;
+
+            q2.x = q1.x + ux*minSep;
+            q2.y = q1.y + uy*minSep;
+        }
+
+        redraw();
+    });
+
+    function stopDrag(ev) {
+        if (!dragging) return;
+
+        if (pointerId !== null && charge2.hasPointerCapture(pointerId)) {
+            charge2.releasePointerCapture(pointerId);
+        }
+
+        dragging = false;
+        pointerId = null;
+
+        charge2.classList.remove("dragging");
+    }
+
+    charge2.addEventListener("pointerup", stopDrag);
+    charge2.addEventListener("pointercancel", stopDrag);
+
+    charge2.addEventListener("keydown", ev => {
+        const step = ev.shiftKey ? 12 : 5;
+
+        if (ev.key === "ArrowLeft") q2.x -= step;
+        else if (ev.key === "ArrowRight") q2.x += step;
+        else if (ev.key === "ArrowUp") q2.y -= step;
+        else if (ev.key === "ArrowDown") q2.y += step;
+        else return;
+
+        ev.preventDefault();
+
+        q2.x = clamp(q2.x, bounds.left, bounds.right);
+        q2.y = clamp(q2.y, bounds.top, bounds.bottom);
+
+        redraw();
+    });
+
+    negativeBtn.addEventListener("click", () => {
+        q2.q = -Math.abs(Number(magnitude.value));
+
+        negativeBtn.classList.add("active");
+        positiveBtn.classList.remove("active");
+
+        redraw();
+    });
+
+    positiveBtn.addEventListener("click", () => {
+        q2.q = Math.abs(Number(magnitude.value));
+
+        positiveBtn.classList.add("active");
+        negativeBtn.classList.remove("active");
+
+        redraw();
+    });
+
+    magnitude.addEventListener("input", () => {
+        const s = q2.q >= 0 ? 1 : -1;
+        q2.q = s*Number(magnitude.value);
+        redraw();
+    });
+
+    fluxCount.addEventListener("input", drawLines);
+
+    resetBtn.addEventListener("click", () => {
+        q2.x = 515;
+        q2.y = 260;
+        redraw();
+    });
+
+    redraw();
+})();
+</script>
+</body>
+</html>
