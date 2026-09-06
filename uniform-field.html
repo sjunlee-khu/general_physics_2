@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>평행판 사이의 균일한 전기장</title>
+<style>
+  body { font-family: Arial, "Noto Sans KR", sans-serif; margin:0; background:#f7f7f8; color:#222; }
+  .wrap { max-width: 980px; margin:28px auto; padding:20px; }
+  .card { background:#fff; border:1px solid #ddd; border-radius:16px; padding:20px; }
+  h1 { margin-top:0; font-size:28px; }
+  .grid { display:grid; grid-template-columns:1fr 260px; gap:20px; align-items:start; }
+  svg { width:100%; height:auto; background:#fafafa; border:1px solid #e5e5e5; border-radius:12px; }
+  label { display:block; font-weight:700; margin:14px 0 8px; }
+  input[type=range] { width:100%; }
+  .row { display:flex; gap:10px; }
+  button { flex:1; padding:10px 12px; border:1px solid #bbb; border-radius:10px; background:#fff; cursor:pointer; font-size:16px; }
+  button.active { background:#e8eefc; border-color:#5677d9; }
+  .info { margin-top:16px; padding:12px; background:#f2f3f5; border-radius:10px; line-height:1.6; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>평행판 사이의 균일한 전기장</h1>
+    <div class="grid">
+      <div>
+        <svg viewBox="0 0 640 360" aria-label="평행판 사이 균일 전기장">
+          <defs>
+            <marker id="arrowE" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#3b6fd8"></path>
+            </marker>
+            <marker id="arrowF" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#d85a5a"></path>
+            </marker>
+          </defs>
+
+          <rect x="45" y="55" width="20" height="250" rx="5" fill="#d95f59"></rect>
+          <rect x="575" y="55" width="20" height="250" rx="5" fill="#4f6fd3"></rect>
+          <text x="55" y="37" text-anchor="middle" font-size="25" font-weight="700">+</text>
+          <text x="585" y="37" text-anchor="middle" font-size="28" font-weight="700">−</text>
+
+          <g id="fieldLines"></g>
+
+          <g transform="translate(320 180)">
+            <circle r="20" fill="#fff" stroke="#222" stroke-width="2"></circle>
+            <text id="probeSign" y="7" text-anchor="middle" font-size="22" font-weight="700">+</text>
+          </g>
+
+          <line id="forceLine" x1="345" y1="180" x2="430" y2="180"
+                stroke="#d85a5a" stroke-width="5" marker-end="url(#arrowF)"></line>
+          <text id="forceLabel" x="388" y="160" text-anchor="middle" font-size="18" font-weight="700" fill="#d85a5a">F = qE</text>
+
+          <text x="320" y="338" text-anchor="middle" font-size="16" fill="#666">
+            평행하고 등간격인 전기장선 → 판 사이에서 E가 거의 일정
+          </text>
+        </svg>
+      </div>
+
+      <div>
+        <label for="fieldStrength">전기장 세기</label>
+        <input id="fieldStrength" type="range" min="1" max="5" step="1" value="3">
+        <div>세기 단계: <span id="strengthVal">3</span></div>
+
+        <label>시험전하</label>
+        <div class="row">
+          <button id="positiveBtn" class="active">+q</button>
+          <button id="negativeBtn">−q</button>
+        </div>
+
+        <div class="info">
+          <div><b>전기장 방향:</b> +판 → −판</div>
+          <div><b>시험전하의 힘:</b> <span id="forceText">전기장과 같은 방향</span></div>
+          <div style="margin-top:8px;">양전하는 전기장 방향으로, 음전하는 전기장과 반대 방향으로 힘을 받습니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const fieldLines = document.getElementById("fieldLines");
+  const slider = document.getElementById("fieldStrength");
+  const strengthVal = document.getElementById("strengthVal");
+  const positiveBtn = document.getElementById("positiveBtn");
+  const negativeBtn = document.getElementById("negativeBtn");
+  const probeSign = document.getElementById("probeSign");
+  const forceLine = document.getElementById("forceLine");
+  const forceLabel = document.getElementById("forceLabel");
+  const forceText = document.getElementById("forceText");
+  let positive = true;
+
+  function drawField() {
+    fieldLines.replaceChildren();
+    const level = Number(slider.value);
+    strengthVal.textContent = level;
+    const count = 4 + level * 2;
+    const y0 = 78, y1 = 282;
+
+    for (let i = 0; i < count; i++) {
+      const y = y0 + i * (y1-y0) / (count-1);
+      const line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", 82);
+      line.setAttribute("x2", 558);
+      line.setAttribute("y1", y);
+      line.setAttribute("y2", y);
+      line.setAttribute("stroke", "#3b6fd8");
+      line.setAttribute("stroke-width", 1.4 + level * 0.25);
+      line.setAttribute("marker-end", "url(#arrowE)");
+      line.setAttribute("opacity", "0.9");
+      fieldLines.appendChild(line);
+    }
+    updateForce();
+  }
+
+  function updateForce() {
+    const level = Number(slider.value);
+    const len = 45 + level * 14;
+    probeSign.textContent = positive ? "+" : "−";
+
+    if (positive) {
+      forceLine.setAttribute("x1", "345");
+      forceLine.setAttribute("x2", String(320 + len));
+      forceLabel.setAttribute("x", String((345 + 320 + len) / 2));
+      forceText.textContent = "전기장과 같은 방향";
+    } else {
+      // 선 자체의 진행 방향을 오른쪽→왼쪽으로 잡아 marker-end가 왼쪽을 향하게 함
+      forceLine.setAttribute("x1", "295");
+      forceLine.setAttribute("x2", String(320 - len));
+      forceLabel.setAttribute("x", String((295 + 320 - len) / 2));
+      forceText.textContent = "전기장과 반대 방향";
+    }
+    forceLine.setAttribute("marker-end", "url(#arrowF)");
+  }
+
+  positiveBtn.addEventListener("click", () => {
+    positive = true;
+    positiveBtn.classList.add("active");
+    negativeBtn.classList.remove("active");
+    updateForce();
+  });
+
+  negativeBtn.addEventListener("click", () => {
+    positive = false;
+    negativeBtn.classList.add("active");
+    positiveBtn.classList.remove("active");
+    updateForce();
+  });
+
+  slider.addEventListener("input", drawField);
+  drawField();
+})();
+</script>
+</body>
+</html>

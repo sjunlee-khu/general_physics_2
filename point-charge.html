@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>점전하 전기장 — 드래그 가능한 시험전하</title>
+<style>
+  body { font-family: Arial, "Noto Sans KR", sans-serif; margin: 0; background:#f7f7f8; color:#222; }
+  .wrap { max-width: 960px; margin: 28px auto; padding: 20px; }
+  .card { background:#fff; border:1px solid #ddd; border-radius:16px; padding:20px; }
+  h1 { margin-top:0; font-size:28px; }
+  .grid { display:grid; grid-template-columns: 1fr 270px; gap:20px; align-items:start; }
+  svg { width:100%; height:auto; background:#fafafa; border:1px solid #e5e5e5; border-radius:12px; touch-action:none; }
+  label { display:block; font-weight:700; margin:14px 0 8px; }
+  input[type=range] { width:100%; }
+  .row { display:flex; gap:10px; }
+  button { flex:1; min-height:44px; padding:10px 12px; border:1px solid #bbb; border-radius:10px; background:#fff; cursor:pointer; font-size:16px; }
+  button.active { background:#e8eefc; border-color:#5677d9; }
+  .info { margin-top:16px; padding:12px; background:#f2f3f5; border-radius:10px; line-height:1.65; }
+  .eq { font-size:20px; font-weight:700; margin-top:12px; }
+  .hint { font-size:14px; color:#666; margin-top:10px; }
+  #probe { cursor:grab; }
+  #probe.dragging { cursor:grabbing; }
+  @media (max-width: 760px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>점전하의 전기장</h1>
+    <div class="grid">
+      <div>
+        <svg id="viz" viewBox="0 0 640 460" aria-label="점전하 전기장. 빨간 시험전하를 드래그해 위치를 바꿀 수 있습니다.">
+          <defs>
+            <marker id="arrowField" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#3b6fd8"></path>
+            </marker>
+            <marker id="arrowLocal" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#d85a5a"></path>
+            </marker>
+          </defs>
+
+          <g id="field"></g>
+
+          <circle cx="320" cy="230" r="29" fill="#fff" stroke="#222" stroke-width="2"></circle>
+          <text id="chargeSign" x="320" y="239" text-anchor="middle" font-size="29" font-weight="700">+</text>
+          <text x="320" y="282" text-anchor="middle" font-size="15" fill="#555">source charge</text>
+
+          <line id="radiusLine" x1="320" y1="230" x2="460" y2="230"
+                stroke="#999" stroke-width="1.5" stroke-dasharray="6 5"></line>
+          <text id="rLabel" x="390" y="218" text-anchor="middle" font-size="15" fill="#666">r</text>
+
+          <line id="localFieldArrow" x1="474" y1="230" x2="545" y2="230"
+                stroke="#d85a5a" stroke-width="4" marker-end="url(#arrowLocal)"></line>
+          <text id="eLabel" x="510" y="214" text-anchor="middle" font-size="16" font-weight="700" fill="#d85a5a">E</text>
+
+          <g id="probe" tabindex="0" aria-label="시험전하. 드래그하거나 방향키로 이동하세요.">
+            <circle id="probeHit" cx="460" cy="230" r="24" fill="transparent"></circle>
+            <circle id="probeDot" cx="460" cy="230" r="11" fill="#d85a5a" stroke="#fff" stroke-width="2"></circle>
+          </g>
+          <text id="probeLabel" x="460" y="202" text-anchor="middle" font-size="15">probe</text>
+
+          <text x="320" y="432" text-anchor="middle" font-size="15" fill="#666">
+            빨간 시험전하를 마우스로 드래그하세요
+          </text>
+        </svg>
+      </div>
+
+      <div>
+        <label>전하의 부호</label>
+        <div class="row">
+          <button id="posBtn" class="active" type="button">+q</button>
+          <button id="negBtn" type="button">−q</button>
+        </div>
+
+        <label for="magnitude">전하량 |q|</label>
+        <input id="magnitude" type="range" min="1" max="5" step="1" value="3">
+        <div>|q| = <span id="qVal">3</span></div>
+
+        <div class="eq">E ∝ |q| / r²</div>
+
+        <div class="info">
+          <div><b>거리 r:</b> <span id="rVal">140.0</span> 상대 단위</div>
+          <div><b>상대적 E:</b> <span id="eVal"></span></div>
+          <div><b>방향:</b> <span id="directionText">점전하에서 바깥쪽</span></div>
+        </div>
+
+        <div class="hint">
+          전기력선의 길이는 고정하고, |q|가 커질수록 선의 개수를 늘려 더 조밀하게 표시합니다.<br><br>드래그가 어려우면 시험전하를 선택한 뒤 방향키로도 움직일 수 있습니다.
+        </div>
+
+        <button id="resetBtn" type="button" style="width:100%; margin-top:14px;">시험전하 위치 초기화</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("viz");
+  const field = document.getElementById("field");
+  const signText = document.getElementById("chargeSign");
+  const magnitude = document.getElementById("magnitude");
+  const qVal = document.getElementById("qVal");
+  const rVal = document.getElementById("rVal");
+  const eVal = document.getElementById("eVal");
+  const directionText = document.getElementById("directionText");
+  const posBtn = document.getElementById("posBtn");
+  const negBtn = document.getElementById("negBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const probe = document.getElementById("probe");
+  const probeHit = document.getElementById("probeHit");
+  const probeDot = document.getElementById("probeDot");
+  const probeLabel = document.getElementById("probeLabel");
+  const radiusLine = document.getElementById("radiusLine");
+  const rLabel = document.getElementById("rLabel");
+  const localArrow = document.getElementById("localFieldArrow");
+  const eLabel = document.getElementById("eLabel");
+
+  const cx = 320, cy = 230;
+  const bounds = {left:45, right:595, top:45, bottom:395};
+  const minR = 48;
+  let probeX = 460, probeY = 230;
+  let positive = true;
+  let dragging = false;
+  let pointerId = null;
+
+  function drawFieldLines() {
+    field.replaceChildren();
+    const q = Number(magnitude.value);
+    qVal.textContent = q;
+
+    // 전기력선의 "길이"는 전기장 세기를 나타내지 않는다.
+    // |q|가 커질수록 같은 공간 안의 선 개수(밀도)를 늘려 세기를 표현한다.
+    const n = 8 + q * 6;      // q=1 -> 14개, q=5 -> 38개
+    const inner = 38;
+    const outer = 190;        // 모든 q에서 동일한 길이
+
+    for (let i = 0; i < n; i++) {
+      const a = 2 * Math.PI * i / n;
+      let x1, y1, x2, y2;
+
+      if (positive) {
+        x1 = cx + inner*Math.cos(a);
+        y1 = cy + inner*Math.sin(a);
+        x2 = cx + outer*Math.cos(a);
+        y2 = cy + outer*Math.sin(a);
+      } else {
+        x1 = cx + outer*Math.cos(a);
+        y1 = cy + outer*Math.sin(a);
+        x2 = cx + inner*Math.cos(a);
+        y2 = cy + inner*Math.sin(a);
+      }
+
+      const line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      line.setAttribute("stroke", "#3b6fd8");
+      line.setAttribute("stroke-width", 1.8);
+      line.setAttribute("marker-end", "url(#arrowField)");
+      line.setAttribute("opacity", "0.88");
+      field.appendChild(line);
+    }
+  }
+
+  function clampProbe(x, y) {
+    x = Math.max(bounds.left, Math.min(bounds.right, x));
+    y = Math.max(bounds.top, Math.min(bounds.bottom, y));
+
+    let dx = x - cx;
+    let dy = y - cy;
+    let r = Math.hypot(dx, dy);
+
+    if (r < minR) {
+      if (r < 1e-6) {
+        dx = minR;
+        dy = 0;
+        r = minR;
+      } else {
+        x = cx + dx / r * minR;
+        y = cy + dy / r * minR;
+      }
+    }
+    return [x, y];
+  }
+
+  function updateProbe() {
+    [probeX, probeY] = clampProbe(probeX, probeY);
+
+    probeHit.setAttribute("cx", probeX);
+    probeHit.setAttribute("cy", probeY);
+    probeDot.setAttribute("cx", probeX);
+    probeDot.setAttribute("cy", probeY);
+    probeLabel.setAttribute("x", probeX);
+    probeLabel.setAttribute("y", probeY - 27);
+
+    radiusLine.setAttribute("x2", probeX);
+    radiusLine.setAttribute("y2", probeY);
+
+    const dx = probeX - cx;
+    const dy = probeY - cy;
+    const r = Math.hypot(dx, dy);
+    const ux = dx / r;
+    const uy = dy / r;
+
+    rLabel.setAttribute("x", cx + dx * 0.52);
+    rLabel.setAttribute("y", cy + dy * 0.52 - 8);
+
+    const q = Number(magnitude.value);
+    const relE = q / (r*r);
+    rVal.textContent = r.toFixed(1);
+    eVal.textContent = relE.toExponential(3);
+
+    // Local electric-field vector at the probe.
+    const dir = positive ? 1 : -1;
+    const startOffset = 16;
+    const arrowLength = Math.max(36, Math.min(90, 35 + 550000 * relE));
+    const sx = probeX + dir * ux * startOffset;
+    const sy = probeY + dir * uy * startOffset;
+    const ex = sx + dir * ux * arrowLength;
+    const ey = sy + dir * uy * arrowLength;
+
+    localArrow.setAttribute("x1", sx);
+    localArrow.setAttribute("y1", sy);
+    localArrow.setAttribute("x2", ex);
+    localArrow.setAttribute("y2", ey);
+    eLabel.setAttribute("x", (sx + ex)/2 - uy*14);
+    eLabel.setAttribute("y", (sy + ey)/2 + ux*14);
+
+    directionText.textContent = positive ? "점전하에서 바깥쪽" : "점전하를 향하는 안쪽";
+  }
+
+  function updateAll() {
+    signText.textContent = positive ? "+" : "−";
+    drawFieldLines();
+    updateProbe();
+  }
+
+  function svgPointFromEvent(event) {
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return [probeX, probeY];
+    const p = pt.matrixTransform(matrix.inverse());
+    return [p.x, p.y];
+  }
+
+  probe.addEventListener("pointerdown", (event) => {
+    dragging = true;
+    pointerId = event.pointerId;
+    probe.setPointerCapture(pointerId);
+    probe.classList.add("dragging");
+    const [x,y] = svgPointFromEvent(event);
+    probeX = x; probeY = y;
+    updateProbe();
+  });
+
+  probe.addEventListener("pointermove", (event) => {
+    if (!dragging || event.pointerId !== pointerId) return;
+    const [x,y] = svgPointFromEvent(event);
+    probeX = x; probeY = y;
+    updateProbe();
+  });
+
+  function endDrag(event) {
+    if (!dragging) return;
+    if (pointerId !== null && probe.hasPointerCapture(pointerId)) {
+      probe.releasePointerCapture(pointerId);
+    }
+    dragging = false;
+    pointerId = null;
+    probe.classList.remove("dragging");
+  }
+
+  probe.addEventListener("pointerup", endDrag);
+  probe.addEventListener("pointercancel", endDrag);
+
+  probe.addEventListener("keydown", (event) => {
+    const step = event.shiftKey ? 10 : 4;
+    if (event.key === "ArrowLeft") probeX -= step;
+    else if (event.key === "ArrowRight") probeX += step;
+    else if (event.key === "ArrowUp") probeY -= step;
+    else if (event.key === "ArrowDown") probeY += step;
+    else return;
+    event.preventDefault();
+    updateProbe();
+  });
+
+  posBtn.addEventListener("click", () => {
+    positive = true;
+    posBtn.classList.add("active");
+    negBtn.classList.remove("active");
+    updateAll();
+  });
+
+  negBtn.addEventListener("click", () => {
+    positive = false;
+    negBtn.classList.add("active");
+    posBtn.classList.remove("active");
+    updateAll();
+  });
+
+  magnitude.addEventListener("input", updateAll);
+
+  resetBtn.addEventListener("click", () => {
+    probeX = 460;
+    probeY = 230;
+    updateProbe();
+  });
+
+  updateAll();
+})();
+</script>
+</body>
+</html>
