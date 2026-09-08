@@ -1,0 +1,368 @@
+
+<div style="font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                max-width: 1040px; line-height: 1.45; color:#1f2937;">
+  <div style="padding:10px 12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:16px;">
+    <b>정규화 단위:</b> 이 위젯은 <span style="font-family:serif;">\(1/(4\pi\epsilon_0)=1\)</span> 인 단위를 사용합니다.
+    따라서 축 라벨의 전기장은 <b>정규화 단위(arbitrary units)</b>입니다.
+  </div>
+
+  <h2>1) 원형 고리의 축 위 전기장</h2>
+  <div style="margin-bottom: 8px;">
+    <label><b>R (cm)</b></label>
+    <input type="range" id="ringR" min="0.5" max="20" step="0.5" value="5" style="width:280px;">
+    <span id="ringRVal">5.0</span>
+    &nbsp;&nbsp;&nbsp;
+    <label><b>z 범위 (cm)</b></label>
+    <input type="range" id="ringZmax" min="5" max="50" step="1" value="20" style="width:280px;">
+    <span id="ringZmaxVal">20</span>
+    &nbsp;&nbsp;&nbsp;
+    <label><b>Q</b></label>
+    <input type="range" id="ringQ" min="0.2" max="2.0" step="0.1" value="1.0" style="width:180px;">
+    <span id="ringQVal">1.0</span>
+  </div>
+  <div id="ringInfo" style="margin: 6px 0 10px 0;"></div>
+  <div style="font-size:13px; color:#6b7280; margin:2px 0 8px 0;">모식도는 개념 설명용이며 슬라이더와 연동되지 않습니다.</div>
+  <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+    <svg id="ringGeom" width="260" height="220" style="border:1px solid #e5e7eb; background:white; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.05);"></svg>
+    <svg id="ringPlot" width="680" height="420" style="border:1px solid #e5e7eb; background:white; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.05);"></svg>
+  </div>
+
+  <hr style="margin: 28px 0;">
+
+  <h2>2) 원판 → 무한 평면: 축 위 전기장</h2>
+  <div style="margin-bottom: 8px;">
+    <label><b>R (cm)</b></label>
+    <input type="range" id="diskR" min="1" max="200" step="1" value="20" style="width:320px;">
+    <span id="diskRVal">20</span>
+    &nbsp;&nbsp;&nbsp;
+    <label><b>z 범위 (cm)</b></label>
+    <input type="range" id="diskZmax" min="5" max="60" step="1" value="20" style="width:240px;">
+    <span id="diskZmaxVal">20</span>
+    &nbsp;&nbsp;&nbsp;
+    <label><b>σ</b></label>
+    <input type="range" id="diskSigma" min="0.2" max="2.0" step="0.1" value="1.0" style="width:180px;">
+    <span id="diskSigmaVal">1.0</span>
+  </div>
+  <div id="diskInfo" style="margin: 6px 0 10px 0;"></div>
+  <div style="font-size:13px; color:#6b7280; margin:2px 0 8px 0;">모식도는 개념 설명용이며 슬라이더와 연동되지 않습니다.</div>
+  <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+    <svg id="diskGeom" width="260" height="220" style="border:1px solid #e5e7eb; background:white; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.05);"></svg>
+    <svg id="diskPlot" width="680" height="420" style="border:1px solid #e5e7eb; background:white; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.05);"></svg>
+  </div>
+
+  <div style="margin-top: 16px; padding: 12px; background: #f7f7f7; border: 1px solid #ddd;">
+    <b>수업 포인트</b>
+    <ul>
+      <li><b>고리:</b> \(z=0\) 에서 \(E=0\), 양쪽에서 부호가 바뀝니다.</li>
+      <li>고리의 축 위 전기장은 \(|z|=R/\sqrt{2}\) 에서 최대가 됩니다.</li>
+      <li><b>원판:</b> \(R\) 를 크게 하면 곡선이 점점 <b>수평선</b> \(E=2\pi\sigma\) 에 가까워집니다.</li>
+      <li>즉, 원판의 반지름이 커질수록 무한 평면의 일정한 전기장에 접근합니다.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function() {
+  function clearSVG(svg) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+  }
+
+  function addSVG(tag, attrs, parent) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const key in attrs) el.setAttribute(key, attrs[key]);
+    parent.appendChild(el);
+    return el;
+  }
+
+  function fmt(x, digits=2) {
+    return Number(x).toFixed(digits);
+  }
+
+  function drawPlot(svgId, seriesList, xMin, xMax, yMin, yMax, xlabel, ylabel, title, legendLabels) {
+    const svg = document.getElementById(svgId);
+    clearSVG(svg);
+
+    const W = Number(svg.getAttribute("width"));
+    const H = Number(svg.getAttribute("height"));
+    const m = {l: 82, r: 22, t: 38, b: 58};
+
+    function X(x) { return m.l + (x - xMin) / (xMax - xMin) * (W - m.l - m.r); }
+    function Y(y) { return H - m.b - (y - yMin) / (yMax - yMin) * (H - m.t - m.b); }
+
+    addSVG("rect", {x:0, y:0, width:W, height:H, fill:"white"}, svg);
+
+    const nXTicks = 6;
+    const nYTicks = 6;
+
+    for (let i = 0; i <= nXTicks; i++) {
+      const xVal = xMin + (xMax - xMin) * i / nXTicks;
+      const xPix = X(xVal);
+      addSVG("line", {x1:xPix, y1:m.t, x2:xPix, y2:H-m.b, stroke:"#eef1f4"}, svg);
+      addSVG("line", {x1:xPix, y1:H-m.b, x2:xPix, y2:H-m.b+6, stroke:"black"}, svg);
+      const txt = addSVG("text", {x:xPix, y:H-m.b+22, "text-anchor":"middle", "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg);
+      txt.textContent = fmt(xVal, 1);
+    }
+
+    for (let j = 0; j <= nYTicks; j++) {
+      const yVal = yMin + (yMax - yMin) * j / nYTicks;
+      const yPix = Y(yVal);
+      addSVG("line", {x1:m.l, y1:yPix, x2:W-m.r, y2:yPix, stroke:"#eef1f4"}, svg);
+      addSVG("line", {x1:m.l-6, y1:yPix, x2:m.l, y2:yPix, stroke:"black"}, svg);
+      const txt = addSVG("text", {x:m.l-10, y:yPix+4, "text-anchor":"end", "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg);
+      txt.textContent = fmt(yVal, 2);
+    }
+
+    addSVG("line", {x1:m.l, y1:H-m.b, x2:W-m.r, y2:H-m.b, stroke:"#374151", "stroke-width":"1.6"}, svg);
+    addSVG("line", {x1:m.l, y1:m.t, x2:m.l, y2:H-m.b, stroke:"#374151", "stroke-width":"1.6"}, svg);
+
+    if (yMin < 0 && yMax > 0) {
+      const yZero = Y(0);
+      addSVG("line", {x1:m.l, y1:yZero, x2:W-m.r, y2:yZero, stroke:"#999", "stroke-dasharray":"4,4"}, svg);
+    }
+
+    const titleText = addSVG("text", {x:W/2, y:22, "text-anchor":"middle", "font-size":"18", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif", "font-weight":"650"}, svg);
+    titleText.textContent = title;
+
+    const xlabelText = addSVG("text", {x:(m.l + W - m.r)/2, y:H-15, "text-anchor":"middle", "font-size":"15", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg);
+    xlabelText.textContent = xlabel;
+
+    const ylabelText = addSVG("text", {
+      x:22, y:(m.t + H - m.b)/2,
+      transform:`rotate(-90 22 ${(m.t + H - m.b)/2})`,
+      "text-anchor":"middle", "font-size":"15", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"
+    }, svg);
+    ylabelText.textContent = ylabel;
+
+    seriesList.forEach((series, idx) => {
+      let d = "";
+      for (let i = 0; i < series.length; i++) {
+        const px = X(series[i][0]);
+        const py = Y(series[i][1]);
+        d += (i === 0 ? "M " : " L ") + px + " " + py;
+      }
+      const attrs = {
+        d: d,
+        fill: "none",
+        stroke: idx === 0 ? "#2563eb" : "#dc2626",
+        "stroke-width": 3.2
+      };
+      if (idx === 1) attrs["stroke-dasharray"] = "8,6";
+      addSVG("path", attrs, svg);
+    });
+
+    if (legendLabels && legendLabels.length > 0) {
+      const lx = W - m.r - 200;
+      let ly = m.t + 18;
+      for (let i = 0; i < legendLabels.length; i++) {
+        addSVG("line", {
+          x1: lx, y1: ly + i*22, x2: lx + 28, y2: ly + i*22,
+          stroke: i === 0 ? "#2563eb" : "#dc2626",
+          "stroke-width": 3.2,
+          "stroke-dasharray": i === 1 ? "8,6" : ""
+        }, svg);
+        const txt = addSVG("text", {x: lx + 36, y: ly + 4 + i*22, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg);
+        txt.textContent = legendLabels[i];
+      }
+    }
+  }
+
+  function drawRingGeometry(svgId, Rcm, zmarkcm) {
+    const svg = document.getElementById(svgId);
+    clearSVG(svg);
+    const W = Number(svg.getAttribute("width"));
+    const H = Number(svg.getAttribute("height"));
+
+    addSVG("rect", {x:0, y:0, width:W, height:H, fill:"white"}, svg);
+
+    const cx = 95, cy = H/2;
+    const rx = 24 + 0.9 * Rcm;
+    const ry = 50;
+
+    // z-axis
+    addSVG("line", {x1:30, y1:cy, x2:235, y2:cy, stroke:"#666", "stroke-width":"1.5"}, svg);
+    addSVG("text", {x:238, y:cy+5, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "z";
+
+    // ring
+    addSVG("ellipse", {cx:cx, cy:cy, rx:rx, ry:ry, fill:"none", stroke:"#1f77b4", "stroke-width":"3"}, svg);
+
+    // center mark
+    addSVG("circle", {cx:cx, cy:cy, r:3.5, fill:"#000"}, svg);
+    addSVG("text", {x:cx-10, y:cy-10, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "O";
+
+    // point P on axis
+    const px = Math.min(220, cx + 18 + 2.2 * zmarkcm);
+    addSVG("circle", {cx:px, cy:cy, r:4.5, fill:"#d62728"}, svg);
+    addSVG("text", {x:px+8, y:cy-8, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "P";
+
+    // arrow from O to P
+    addSVG("line", {x1:cx, y1:cy-18, x2:px, y2:cy-18, stroke:"#444", "stroke-width":"1.5"}, svg);
+    addSVG("polygon", {points:`${px},${cy-18} ${px-8},${cy-22} ${px-8},${cy-14}`, fill:"#444"}, svg);
+    addSVG("text", {x:(cx+px)/2-4, y:cy-24, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "z";
+
+    // radius label
+    addSVG("line", {x1:cx, y1:cy, x2:cx+rx, y2:cy, stroke:"#1f77b4", "stroke-dasharray":"5,4", "stroke-width":"1.5"}, svg);
+    addSVG("text", {x:cx+rx/2-4, y:cy+16, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif", fill:"#1f77b4"}, svg).textContent = "R";
+
+    addSVG("text", {x:12, y:18, "font-size":"15", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif", "font-weight":"650"}, svg).textContent = "원형 고리 모식도";
+  }
+
+  function drawDiskGeometry(svgId, Rcm, zmarkcm) {
+    const svg = document.getElementById(svgId);
+    clearSVG(svg);
+    const W = Number(svg.getAttribute("width"));
+    const H = Number(svg.getAttribute("height"));
+
+    addSVG("rect", {x:0, y:0, width:W, height:H, fill:"white"}, svg);
+
+    const cx = 90, cy = H/2;
+    const rx = Math.min(80, 18 + 0.35 * Rcm);
+    const ry = 48;
+
+    // z-axis
+    addSVG("line", {x1:25, y1:cy, x2:235, y2:cy, stroke:"#666", "stroke-width":"1.5"}, svg);
+    addSVG("text", {x:238, y:cy+5, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "z";
+
+    // disk
+    addSVG("ellipse", {cx:cx, cy:cy, rx:rx, ry:ry, fill:"#cfe2ff", stroke:"#1f77b4", "stroke-width":"2.5", opacity:"0.95"}, svg);
+
+    // annulus/ring hint inside disk
+    addSVG("ellipse", {cx:cx, cy:cy, rx:0.62*rx, ry:0.62*ry, fill:"none", stroke:"#ff7f0e", "stroke-width":"2", "stroke-dasharray":"6,4"}, svg);
+    addSVG("text", {x:18, y:H-20, "font-size":"11", fill:"#ff7f0e"}, svg).textContent = "적분에 쓰는 고리(dq)";
+
+    // center mark
+    addSVG("circle", {cx:cx, cy:cy, r:3.5, fill:"#000"}, svg);
+    addSVG("text", {x:cx-10, y:cy-10, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "O";
+
+    // point P on axis
+    const px = Math.min(225, cx + 20 + 2.2 * zmarkcm);
+    addSVG("circle", {cx:px, cy:cy, r:4.5, fill:"#d62728"}, svg);
+    addSVG("text", {x:px+8, y:cy-8, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "P";
+
+    // arrow z
+    addSVG("line", {x1:cx, y1:cy-18, x2:px, y2:cy-18, stroke:"#444", "stroke-width":"1.5"}, svg);
+    addSVG("polygon", {points:`${px},${cy-18} ${px-8},${cy-22} ${px-8},${cy-14}`, fill:"#444"}, svg);
+    addSVG("text", {x:(cx+px)/2-4, y:cy-24, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif"}, svg).textContent = "z";
+
+    // radius label
+    addSVG("line", {x1:cx, y1:cy, x2:cx+rx, y2:cy, stroke:"#1f77b4", "stroke-dasharray":"5,4", "stroke-width":"1.5"}, svg);
+    addSVG("text", {x:cx+rx/2-4, y:cy+16, "font-size":"13", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif", fill:"#1f77b4"}, svg).textContent = "R";
+
+    addSVG("text", {x:12, y:18, "font-size":"15", "font-family":"Inter, Pretendard, Segoe UI, Arial, sans-serif", "font-weight":"650"}, svg).textContent = "원판 모식도";
+  }
+
+  function updateRing() {
+    const Rcm = parseFloat(document.getElementById("ringR").value);
+    const zmaxcm = parseFloat(document.getElementById("ringZmax").value);
+    const Q = parseFloat(document.getElementById("ringQ").value);
+
+    document.getElementById("ringRVal").textContent = Rcm.toFixed(1);
+    document.getElementById("ringZmaxVal").textContent = zmaxcm.toFixed(0);
+    document.getElementById("ringQVal").textContent = Q.toFixed(1);
+
+    const R = Rcm;
+    const zmax = zmaxcm;
+
+    const pts = [];
+    const ptsInvSq = [];
+    let ymax = -1e99, ymin = 1e99;
+
+    for (let i = 0; i <= 900; i++) {
+      const z = -zmax + 2*zmax*i/900.0;
+      const E = Q * z / Math.pow(z*z + R*R, 1.5);
+      pts.push([z, E]);
+      ymax = Math.max(ymax, E);
+      ymin = Math.min(ymin, E);
+    }
+
+    // Exact 1/z^2 point-charge comparison on the +z side.
+    // Begin at z = R to avoid the singularity at z = 0 from dominating the scale.
+    const zStart = Math.max(R, 0.02*zmax);
+    if (zStart < zmax) {
+      for (let i = 0; i <= 450; i++) {
+        const z = zStart + (zmax-zStart)*i/450.0;
+        const EInv = Q/(z*z);
+        ptsInvSq.push([z, EInv]);
+      }
+    }
+
+    const range = Math.max(Math.abs(ymin), Math.abs(ymax));
+
+    drawPlot(
+      "ringPlot",
+      [pts, ptsInvSq],
+      -zmaxcm, zmaxcm,
+      -1.12*range, 1.12*range,
+      "z (cm)",
+      "E_z  (normalized units)",
+      "Electric field on the axis of a ring",
+      ["Ring E_z(z)", "1/z²  (far-field)"]
+    );
+
+    const zPeak = Rcm / Math.sqrt(2);
+    document.getElementById("ringInfo").innerHTML =
+      "<b>현재 설정:</b> R = " + Rcm.toFixed(1) + " cm, Q = " + Q.toFixed(1) +
+      "&nbsp;&nbsp;|&nbsp;&nbsp;" +
+      "<b>최대값 위치:</b> |z| = R/√2 ≈ " + zPeak.toFixed(2) + " cm" +
+      "&nbsp;&nbsp;|&nbsp;&nbsp;" +
+      "<span style='color:#b91c1c'><b>빨간 점선:</b> Q/z² (z ≥ R)</span>";
+
+  }
+
+  function updateDisk() {
+    const Rcm = parseFloat(document.getElementById("diskR").value);
+    const zmaxcm = parseFloat(document.getElementById("diskZmax").value);
+    const sigma = parseFloat(document.getElementById("diskSigma").value);
+
+    document.getElementById("diskRVal").textContent = Rcm.toFixed(0);
+    document.getElementById("diskZmaxVal").textContent = zmaxcm.toFixed(0);
+    document.getElementById("diskSigmaVal").textContent = sigma.toFixed(1);
+
+    const R = Rcm;
+    const zmax = zmaxcm;
+    const Einf = 2 * Math.PI * sigma;
+
+    const ptsDisk = [];
+    const ptsPlane = [];
+    let ymax = -1e99;
+    for (let i = 0; i <= 900; i++) {
+      const z = zmax * i / 900.0;
+      const E = 2 * Math.PI * sigma * (1 - z / Math.sqrt(z*z + R*R));
+      ptsDisk.push([z, E]);
+      ptsPlane.push([z, Einf]);
+      ymax = Math.max(ymax, E, Einf);
+    }
+
+    drawPlot(
+      "diskPlot",
+      [ptsDisk, ptsPlane],
+      0, zmaxcm,
+      0, 1.08*ymax,
+      "z (cm)",
+      "E_z  (normalized units)",
+      "Electric field above a uniformly charged disk",
+      ["Disk", "Infinite-plane limit"]
+    );
+
+    document.getElementById("diskInfo").innerHTML =
+      "<b>현재 설정:</b> R = " + Rcm.toFixed(0) + " cm, σ = " + sigma.toFixed(1) +
+      "&nbsp;&nbsp;|&nbsp;&nbsp;" +
+      "<b>무한 평면 극한:</b> E = 2πσ = " + Einf.toFixed(3);
+
+  }
+
+  document.getElementById("ringR").addEventListener("input", updateRing);
+  document.getElementById("ringZmax").addEventListener("input", updateRing);
+  document.getElementById("ringQ").addEventListener("input", updateRing);
+
+  document.getElementById("diskR").addEventListener("input", updateDisk);
+  document.getElementById("diskZmax").addEventListener("input", updateDisk);
+  document.getElementById("diskSigma").addEventListener("input", updateDisk);
+
+  // Static schematics: these do not change with the sliders.
+  drawRingGeometry("ringGeom", 5, 12);
+  drawDiskGeometry("diskGeom", 20, 12);
+
+  updateRing();
+  updateDisk();
+})();
+</script>
